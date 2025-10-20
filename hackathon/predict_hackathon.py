@@ -45,7 +45,7 @@ def prepare_protein_complex(datapoint_id: str, proteins: List[Protein], input_di
     # will add contact constraints to the input_dict
 
     # Example: predict 5 structures
-    cli_args = ["--diffusion_samples", "5"]
+    cli_args = ["--diffusion_samples", "50"]
     return [(input_dict, cli_args)]
 
 def prepare_protein_ligand(datapoint_id: str, protein: Protein, ligands: list[SmallMolecule], input_dict: dict, msa_dir: Optional[Path] = None) -> List[tuple[dict, List[str]]]:
@@ -246,7 +246,9 @@ def _run_boltz_and_collect(datapoint) -> None:
         ]
         cmd = fixed + cli_args
         print(f"Running config {config_idx}:", " ".join(cmd), flush=True)
-        subprocess.run(cmd, check=True)
+        """
+            subprocess.run(cmd, check=True)
+        """
 
         # Compute prediction subfolder for this config
         pred_subfolder = out_dir / f"boltz_results_{datapoint.datapoint_id}_config_{config_idx}" / "predictions" / f"{datapoint.datapoint_id}_config_{config_idx}"
