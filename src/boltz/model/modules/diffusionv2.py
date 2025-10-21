@@ -444,6 +444,7 @@ class AtomDiffusion(Module):
                 if (
                     steering_args["physical_guidance_update"]
                     or steering_args["contact_guidance_update"]
+                    or steering_args["antibody_angle_bias"]
                 ) and step_idx < num_sampling_steps - 1:
                     guidance_update = torch.zeros_like(atom_coords_denoised)
                     for guidance_step in range(steering_args["num_gd_steps"]):

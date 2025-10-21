@@ -669,7 +669,7 @@ class ContactPotentital(FlatBottomPotential, DistancePotential):
 
 class AntibodyAnglePotential(Potential):
     def compute_parameters(self, t):
-        return {"guidance_weight": 0.0, "resampling_weight": 0.0}
+        return {"guidance_weight": 0.1, "resampling_weight": 0.0}
     
     def compute_gradient(self, coords, feats, parameters):
         c_alphas = feats["atom_backbone_feat"] == 2
