@@ -667,6 +667,13 @@ class ContactPotentital(FlatBottomPotential, DistancePotential):
             (negation_mask, union_index),
         )
 
+class AntibodyAnglePotential(Potential):
+    def compute_gradient(self, coords, feats, parameters):
+        c_alphas = feats["atom_backbone_feat"] == 2
+        print('MYLOG', 'C_ALPHA SHAPE', c_alphas.shape)
+        print('MYLOG', 'C_ALPHA', c_alphas)
+        return torch.zeros_like(coords)
+
 
 def get_potentials(steering_args, boltz2=False):
     potentials = []
