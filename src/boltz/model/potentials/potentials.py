@@ -672,6 +672,8 @@ class AntibodyAnglePotential(Potential):
         return {"guidance_weight": 0.1, "resampling_weight": 0.0, "guidance_interval": 1, "antibody_angle_bias_weight": 1.0}
     
     def compute_gradient(self, coords, feats, parameters):
+        connected_chain_index = feats["connected_chain_index"]
+        print('00000000', 'CONNECTED CHAIN INDEX', connected_chain_index.shape, connected_chain_index)
         backbone = feats["atom_backbone_feat"]
         feats["token_to_rep_atom"]
         #print('MYLOG', 'token to rep atom', feats["token_to_rep_atom"])
