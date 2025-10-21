@@ -447,7 +447,7 @@ class AtomDiffusion(Module):
                     steering_args["physical_guidance_update"]
                     or steering_args["contact_guidance_update"]
                 ) and step_idx < num_sampling_steps - 1:
-                    print('MYLOG', 'doing fk steering step', step_idx)
+                    print('OOOOOOOOO|', 'doing fk steering step', step_idx)
                     guidance_update = torch.zeros_like(atom_coords_denoised)
                     for guidance_step in range(steering_args["num_gd_steps"]):
                         energy_gradient = torch.zeros_like(atom_coords_denoised)
@@ -483,7 +483,7 @@ class AtomDiffusion(Module):
                     )
                     or step_idx == num_sampling_steps - 1
                 ):
-                    print('MYLOG', 'doing resampling', step_idx)
+                    print('OOOOOOOOO|', 'doing resampling', step_idx)
                     resample_indices = (
                         torch.multinomial(
                             resample_weights,
@@ -517,11 +517,11 @@ class AtomDiffusion(Module):
 
             # custom antibody angle steering
             if steering_args["antibody_angle_bias"]:
-                print('MYLOG', 'doing antibody angle biasing')
+                print('OOOOOOOOO', 'doing antibody angle biasing')
                 potential = potentials[0]  # antibody angle potential is first and only in list
                 parameters = potential.compute_parameters(steering_t)
                 # all feature keys
-                print('MYLOG','all feature keys', network_condition_kwargs["feats"].keys())
+                #print('OOOOOOOOO','all feature keys', network_condition_kwargs["feats"].keys())
                 angle_gradient = potential.compute_gradient(
                     atom_coords_denoised,
                     network_condition_kwargs["feats"],
