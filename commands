@@ -4,3 +4,18 @@
      --submission-dir ./my_predictions \
      --intermediate-dir ./tmp/ \
      --result-folder ./my_results
+
+python hackathon/evaluate_abag.py \
+    --dataset-file hackathon_data/datasets/abag_public/abag_public.jsonl \
+    --submission-folder  ./my_predictions \
+    --result-folder ./my_results
+
+
+
+
+
+zip -r my_predictions.zip my_predictions/
+zip -r my_results.zip my_results/
+
+
+alias docker="podman"
