@@ -1,6 +1,6 @@
 # Submission Documentation
 Our team (Erik, Jan, Ali, Alex, Augustin) pursued two separate approaches:
-1. Creating a custom potential, that guides the VL-VH angle towards an empirical angle distributione extracted from PDBase
+1. Creating a custom potential, that guides the VL-VH angle towards an empirical angle distributione extracted from PDBase (work not completed)
 2. Optimizing which model output metrics should be used for ranking the predicted structures
 
 ## Antibody Angle Potential
@@ -37,5 +37,7 @@ mean+- 1 standard deviation. Unfortunately we did not manage to implement this i
 Potential & Guidance code has very limited documentation, hard to understand in limited hackathon time. **A simple example potential with documentation would be very valuable.**
 
 ## Ranking Metric Optimization
+
+
 
 
