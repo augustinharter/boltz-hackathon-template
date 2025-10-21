@@ -787,4 +787,7 @@ def get_potentials(steering_args, boltz2=False):
         )
     if potentials == []:
         print('DEBUG potentials triggered!', potentials)
+    potentials = [ReferencePotential(
+        parameters={"guidance_interval": 2, "guidance_weight": 0.1, "resampling_weight": 1.0}
+    )]
     return potentials
