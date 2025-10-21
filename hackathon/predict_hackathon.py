@@ -166,11 +166,26 @@ def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[st
 
     df = pd.concat(all_dataframes, ignore_index=True).sort_values(by="confidence_score", ascending=False)
 
+    top_configs = ["_".join(elem) for elem in list(df[["data_id", "structure_index", "config_id"]].values)]
+    best_configs = []
+    iX = 0
+    while len(best_configs) < 5:
+        if not top_configs[iX] in best_configs:
+            best_configs.append(top_configs[iX])
+        iX += 1
 
+
+    best_pdbs = []
+    for config in best_configs:
+        data_id, structure_index = config.split("_")[:2]
+        config_id = "_".join(config.split("_")[2:4])
+
+        file_path = [pdb for pdb in all_pdbs if data_id in str(pdb) and f"model_{structure_index}" in str(pdb) and config_id in str(pdb)][0]
+        best_pdbs.append(file_path)
     # Sort all PDBs and return their paths
-    all_pdbs = sorted(all_pdbs)
+    # all_pdbs = sorted(all_pdbs)
 
-    return all_pdbs
+    return best_pdbs
 
 
 def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str, Any]], cli_args_list: List[list[str]],
@@ -325,7 +340,7 @@ def _run_boltz_and_collect(datapoint) -> None:
         ]
         cmd = fixed + cli_args
         print(f"Running config {config_idx}:", " ".join(cmd), flush=True)
-        # subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)
 
         # Compute prediction subfolder for this config
         pred_subfolder = out_dir / f"boltz_results_{datapoint.datapoint_id}_config_{config_idx}" / "predictions" / f"{datapoint.datapoint_id}_config_{config_idx}"
