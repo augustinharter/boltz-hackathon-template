@@ -672,9 +672,15 @@ class AntibodyAnglePotential(Potential):
         return {"guidance_weight": 0.1, "resampling_weight": 0.0, "guidance_interval": 1, "antibody_angle_bias_weight": 1.0}
     
     def compute_gradient(self, coords, feats, parameters):
-        c_alphas = feats["atom_backbone_feat"] == 2
-        print('MYLOG', 'C_ALPHA SHAPE', c_alphas.shape)
-        print('MYLOG', 'C_ALPHA', c_alphas)
+        backbone = feats["atom_backbone_feat"]
+        feats["token_to_rep_atom"]
+        print('MYLOG', 'token to rep atom', feats["token_to_rep_atom"])
+        print('MYLOG', 'BACKBONE SHAPE', backbone.shape)
+        c_alpha_index = feats["token_to_rep_atom"]
+        c_alpha_mask = backbone[..., 1] == 1
+        print('MYLOG', 'c alpha mask', c_alpha_mask.shape)
+        print('MYLOG', 'c alpha mask sum', c_alpha_mask.sum())
+        
         return torch.zeros_like(coords)
     
     def compute(self, coords, feats, parameters):
