@@ -13,11 +13,13 @@ import yaml
 import pandas as pd
 from hackathon_api import Datapoint, Protein, SmallMolecule
 
+
 # ---------------------------------------------------------------------------
 # ---- Participants should modify these four functions ----------------------
 # ---------------------------------------------------------------------------
 
-def prepare_protein_complex(datapoint_id: str, proteins: List[Protein], input_dict: dict, msa_dir: Optional[Path] = None) -> List[tuple[dict, List[str]]]:
+def prepare_protein_complex(datapoint_id: str, proteins: List[Protein], input_dict: dict,
+                            msa_dir: Optional[Path] = None) -> List[tuple[dict, List[str]]]:
     """
     Prepare input dict and CLI args for a protein complex prediction.
     You can return multiple configurations to run by returning a list of (input_dict, cli_args) tuples.
@@ -45,12 +47,21 @@ def prepare_protein_complex(datapoint_id: str, proteins: List[Protein], input_di
     # ```
     #
     # will add contact constraints to the input_dict
+    # Code executed by Jan
 
+    cli_args = ["--diffusion_samples", "10", "--recycling_steps", "5", "--override"]
+    configs = [(input_dict, cli_args)]
+    for scan_offset in range(0, len(input_dict["sequences"][0]["protein"]["sequence"]), 5):
+        scan_dict = dict(input_dict)
+        scan_dict["constraints"] = {"pocket": {"binder": "H", "contacts": [("A", scan_offset)]}}
+        configs.append((scan_dict, cli_args))
     # Example: predict 5 structures
-    cli_args = ["--diffusion_samples", "50"]
-    return [(input_dict, cli_args)]
 
-def prepare_protein_ligand(datapoint_id: str, protein: Protein, ligands: list[SmallMolecule], input_dict: dict, msa_dir: Optional[Path] = None) -> List[tuple[dict, List[str]]]:
+    return configs
+
+
+def prepare_protein_ligand(datapoint_id: str, protein: Protein, ligands: list[SmallMolecule], input_dict: dict,
+                           msa_dir: Optional[Path] = None) -> List[tuple[dict, List[str]]]:
     """
     Prepare input dict and CLI args for a protein-ligand prediction.
     You can return multiple configurations to run by returning a list of (input_dict, cli_args) tuples.
@@ -82,7 +93,9 @@ def prepare_protein_ligand(datapoint_id: str, protein: Protein, ligands: list[Sm
     cli_args = ["--diffusion_samples", "5"]
     return [(input_dict, cli_args)]
 
-def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[str, Any]], cli_args_list: List[list[str]], prediction_dirs: List[Path]) -> List[Path]:
+
+def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[str, Any]],
+                                 cli_args_list: List[list[str]], prediction_dirs: List[Path]) -> List[Path]:
     """
     Return ranked model files for protein complex submission.
     Args:
@@ -93,20 +106,23 @@ def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[st
     Returns: 
         Sorted pdb file paths that should be used as your submission.
     """
+    data_id = datapoint.datapoint_id
     relevant_json_keys = [
         "confidence_score",
         "ptm",
         "iptm",
         "ligand_iptm",
         "protein_iptm",
-        "complex_pldtt",
+        "complex_plddt",
         "complex_iplddt",
         "complex_pde",
         "complex_ipde"
     ]
-    
+
     # Collect all PDBs and confidence JSON files from all configurations
     all_pdbs = []
+
+    all_dataframes = []
     for prediction_dir in prediction_dirs:
         # PDB -> List
         config_pdbs = sorted(prediction_dir.glob(
@@ -134,27 +150,31 @@ def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[st
                     file_path.name
                 )[0].split("_")[5]
 
-                cur_confidence_data = [
-                    confidence[key] for key in relevant_json_keys
-                ]
+                cur_confidence_data = [confidence[key] for key in relevant_json_keys]
                 confidence_data.append(
                     [data_id, structure_index, config_id] + cur_confidence_data
                 )
 
         confidence_data_new = pd.DataFrame(
-            data=confidence_data, 
+            data=confidence_data,
             columns=["data_id", "structure_index", "config_id"] + relevant_json_keys
         )
-        confidence_data_new = confidence_data_new.sort_values(
-            by=["structure_index", "config_id"]
-        )
+        # confidence_data_new = confidence_data_new.sort_values(
+        #     by=["confidence_score"] #"structure_index", "config_id"]
+        # )
+        all_dataframes.append(confidence_data_new)
+
+    df = pd.concat(all_dataframes, ignore_index=True).sort_values(by="confidence_score", ascending=False)
+
 
     # Sort all PDBs and return their paths
     all_pdbs = sorted(all_pdbs)
 
     return all_pdbs
 
-def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str, Any]], cli_args_list: List[list[str]], prediction_dirs: List[Path]) -> List[Path]:
+
+def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str, Any]], cli_args_list: List[list[str]],
+                                prediction_dirs: List[Path]) -> List[Path]:
     """
     Return ranked model files for protein-ligand submission.
     Args:
@@ -170,10 +190,12 @@ def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str
     for prediction_dir in prediction_dirs:
         config_pdbs = sorted(prediction_dir.glob(f"{datapoint.datapoint_id}_config_*_model_*.pdb"))
         all_pdbs.extend(config_pdbs)
-    
+
     # Sort all PDBs and return their paths
     all_pdbs = sorted(all_pdbs)
+    all_pdbs = [pdb_file for pdb_file in all_pdbs if "config_0" in str(pdb_file)]
     return all_pdbs
+
 
 # -----------------------------------------------------------------------------
 # ---- End of participant section ---------------------------------------------
@@ -187,16 +209,16 @@ DEFAULT_INPUTS_DIR = Path("inputs")
 ap = argparse.ArgumentParser(
     description="Hackathon scaffold for Boltz predictions",
     epilog="Examples:\n"
-            "  Single datapoint: python predict_hackathon.py --input-json examples/specs/example_protein_ligand.json --msa-dir ./msa --submission-dir submission --intermediate-dir intermediate\n"
-            "  Multiple datapoints: python predict_hackathon.py --input-jsonl examples/test_dataset.jsonl --msa-dir ./msa --submission-dir submission --intermediate-dir intermediate",
+           "  Single datapoint: python predict_hackathon.py --input-json examples/specs/example_protein_ligand.json --msa-dir ./msa --submission-dir submission --intermediate-dir intermediate\n"
+           "  Multiple datapoints: python predict_hackathon.py --input-jsonl examples/test_dataset.jsonl --msa-dir ./msa --submission-dir submission --intermediate-dir intermediate",
     formatter_class=argparse.RawDescriptionHelpFormatter
 )
 
 input_group = ap.add_mutually_exclusive_group(required=True)
 input_group.add_argument("--input-json", type=str,
-                        help="Path to JSON datapoint for a single datapoint")
+                         help="Path to JSON datapoint for a single datapoint")
 input_group.add_argument("--input-jsonl", type=str,
-                        help="Path to JSONL file with multiple datapoint definitions")
+                         help="Path to JSONL file with multiple datapoint definitions")
 
 ap.add_argument("--msa-dir", type=Path,
                 help="Directory containing MSA files (for computing relative paths in YAML)")
@@ -211,7 +233,9 @@ ap.add_argument("--result-folder", type=Path, required=False, default=None,
 
 args = ap.parse_args()
 
-def _prefill_input_dict(datapoint_id: str, proteins: Iterable[Protein], ligands: Optional[list[SmallMolecule]] = None, msa_dir: Optional[Path] = None) -> dict:
+
+def _prefill_input_dict(datapoint_id: str, proteins: Iterable[Protein], ligands: Optional[list[SmallMolecule]] = None,
+                        msa_dir: Optional[Path] = None) -> dict:
     """
     Prepare input dict for Boltz YAML.
     """
@@ -238,14 +262,14 @@ def _prefill_input_dict(datapoint_id: str, proteins: Iterable[Protein], ligands:
         seqs.append(entry)
     if ligands:
         def _format_ligand(ligand: SmallMolecule) -> dict:
-            output =  {
+            output = {
                 "ligand": {
                     "id": ligand.id,
                     "smiles": ligand.smiles
                 }
             }
             return output
-        
+
         for ligand in ligands:
             seqs.append(_format_ligand(ligand))
     doc = {
@@ -253,6 +277,7 @@ def _prefill_input_dict(datapoint_id: str, proteins: Iterable[Protein], ligands:
         "sequences": seqs,
     }
     return doc
+
 
 def _run_boltz_and_collect(datapoint) -> None:
     """
@@ -269,7 +294,8 @@ def _run_boltz_and_collect(datapoint) -> None:
     if datapoint.task_type == "protein_complex":
         configs = prepare_protein_complex(datapoint.datapoint_id, datapoint.proteins, base_input_dict, args.msa_dir)
     elif datapoint.task_type == "protein_ligand":
-        configs = prepare_protein_ligand(datapoint.datapoint_id, datapoint.proteins[0], datapoint.ligands, base_input_dict, args.msa_dir)
+        configs = prepare_protein_ligand(datapoint.datapoint_id, datapoint.proteins[0], datapoint.ligands,
+                                         base_input_dict, args.msa_dir)
     else:
         raise ValueError(f"Unknown task_type: {datapoint.task_type}")
 
@@ -277,10 +303,10 @@ def _run_boltz_and_collect(datapoint) -> None:
     all_input_dicts = []
     all_cli_args = []
     all_pred_subfolders = []
-    
+
     input_dir = args.intermediate_dir / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
-    
+
     for config_idx, (input_dict, cli_args) in enumerate(configs):
         # Write input YAML with config index suffix
         yaml_path = input_dir / f"{datapoint.datapoint_id}_config_{config_idx}.yaml"
@@ -299,12 +325,11 @@ def _run_boltz_and_collect(datapoint) -> None:
         ]
         cmd = fixed + cli_args
         print(f"Running config {config_idx}:", " ".join(cmd), flush=True)
-        subprocess.run(cmd, check=True)
-
+        # subprocess.run(cmd, check=True)
 
         # Compute prediction subfolder for this config
         pred_subfolder = out_dir / f"boltz_results_{datapoint.datapoint_id}_config_{config_idx}" / "predictions" / f"{datapoint.datapoint_id}_config_{config_idx}"
-        
+
         all_input_dicts.append(input_dict)
         all_cli_args.append(cli_args)
         all_pred_subfolders.append(pred_subfolder)
@@ -332,10 +357,12 @@ def _run_boltz_and_collect(datapoint) -> None:
         except Exception as e:
             print(f"WARNING: Failed to set group ownership or permissions: {e}")
 
+
 def _load_datapoint(path: Path):
     """Load JSON datapoint file."""
     with open(path) as f:
         return Datapoint.from_json(f.read())
+
 
 def _run_evaluation(input_file: str, task_type: str, submission_dir: Path, result_folder: Path):
     """
@@ -348,7 +375,7 @@ def _run_evaluation(input_file: str, task_type: str, submission_dir: Path, resul
         result_folder: Directory to save evaluation results
     """
     script_dir = Path(__file__).parent
-    
+
     if task_type == "protein_complex":
         eval_script = script_dir / "evaluate_abag.py"
         cmd = [
@@ -367,14 +394,15 @@ def _run_evaluation(input_file: str, task_type: str, submission_dir: Path, resul
         ]
     else:
         raise ValueError(f"Unknown task_type: {task_type}")
-    
+
     print(f"\n{'=' * 80}")
     print(f"Running evaluation for {task_type}...")
     print(f"Command: {' '.join(cmd)}")
     print(f"{'=' * 80}\n")
-    
+
     subprocess.run(cmd, check=True)
     print(f"\nEvaluation complete. Results saved to {result_folder}")
+
 
 def _process_jsonl(jsonl_path: str, msa_dir: Optional[Path] = None):
     """Process multiple datapoints from a JSONL file."""
@@ -398,6 +426,7 @@ def _process_jsonl(jsonl_path: str, msa_dir: Optional[Path] = None):
             raise e
             continue
 
+
 def _process_json(json_path: str, msa_dir: Optional[Path] = None):
     """Process a single datapoint from a JSON file."""
     print(f"Processing JSON file: {json_path}")
@@ -409,12 +438,13 @@ def _process_json(json_path: str, msa_dir: Optional[Path] = None):
         print(f"ERROR: Failed to process datapoint: {e}")
         raise
 
+
 def main():
     """Main entry point for the hackathon scaffold."""
     # Determine task type from first datapoint for evaluation
     task_type = None
     input_file = None
-    
+
     if args.input_json:
         input_file = args.input_json
         _process_json(args.input_json, args.msa_dir)
@@ -436,7 +466,7 @@ def main():
                     task_type = first_datapoint.task_type
         except Exception as e:
             print(f"WARNING: Could not determine task type: {e}")
-    
+
     # Run evaluation if result folder is specified and task type was determined
     if args.result_folder and task_type and input_file:
         try:
@@ -445,6 +475,7 @@ def main():
             print(f"WARNING: Evaluation failed: {e}")
             import traceback
             traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

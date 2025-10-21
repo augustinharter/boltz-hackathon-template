@@ -1,5 +1,5 @@
 # Submission Documentation
-Our team (Erik, Jan, Ali, Alex, Augustin) pursued two separate approaches:
+Our team (Erik Kubaczka, Jan Krumbach, Ali, Alexander Betz, Augustin Harter) pursued two separate approaches:
 1. Creating a custom potential, that guides the VL-VH angle towards an empirical angle distributione extracted from PDBase (work not completed)
 2. Optimizing which model output metrics should be used for ranking the predicted structures
 

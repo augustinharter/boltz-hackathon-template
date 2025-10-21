@@ -14,8 +14,15 @@ python hackathon/evaluate_abag.py \
 
 
 
-zip -r my_predictions.zip my_predictions/
-zip -r my_results.zip my_results/
+zip -r my_predictions_multi_config.zip my_predictions/
+zip -r my_results_multi_config.zip my_results/
+zip -r tmp_multi_config.zip tmp/
 
 
-alias docker="podman"
+
+
+Configs executed Online:
+configs.append((input_dict, cli_args)) # Default Config
+configs.append((input_dict, cli_args + ["--method", "MD"]))
+configs.append((input_dict, cli_args + ["--method", "MD", "--step_scale", "1.2"]))
+configs.append((input_dict, cli_args + ["--method", "MD", "--step_scale", "1.0", "--sampling_steps", "100"]))
