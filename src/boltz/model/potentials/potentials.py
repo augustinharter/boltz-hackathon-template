@@ -669,8 +669,6 @@ class ContactPotentital(FlatBottomPotential, DistancePotential):
 
 
 def get_potentials(steering_args, boltz2=False):
-    print('PRINT potentials triggered!')
-
     potentials = []
     if steering_args["fk_steering"] or steering_args["physical_guidance_update"]:
         potentials.extend(
@@ -787,4 +785,6 @@ def get_potentials(steering_args, boltz2=False):
                 ),
             ]
         )
+    if potentials == []:
+        print('DEBUG potentials triggered!', potentials)
     return potentials
