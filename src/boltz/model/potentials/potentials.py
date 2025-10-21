@@ -681,13 +681,46 @@ class AntibodyAnglePotential(Potential):
         )[0]
         atom_pad_mask = feats["atom_pad_mask"][0].bool()
         chain_sizes = torch.bincount(atom_chain_id[atom_pad_mask])
-        print('OOOOOOOO', 'CHAIN SIZES', chain_sizes)
-        backbone = feats["atom_backbone_feat"]
-        feats["token_to_rep_atom"]
         #print('MYLOG', 'token to rep atom', feats["token_to_rep_atom"])
         #print('MYLOG', 'BACKBONE SHAPE', backbone.shape)
-        c_alpha_index = feats["token_to_rep_atom"]
-        c_alpha_mask = backbone[..., 1] == 1
+        backbone = feats["atom_backbone_feat"]
+        
+        idxs = torch.arange(backbone.shape[1], device=backbone.device)
+        
+        chain_one_backbone = backbone[0, 0:chain_sizes[0], :]
+        chain_two_backbone = backbone[0, chain_sizes[0]:chain_sizes[0]+chain_sizes[1], :]
+        
+        print('MYLOG', 'chain one backbone shape', chain_one_backbone.shape)
+        print('MYLOG', 'chain two backbone shape', chain_two_backbone.shape)
+        
+        chain_one_idxs = idxs[0, 0:chain_sizes[0], :]
+        chain_two_idxs = idxs[0, chain_sizes[0]:chain_sizes[0]+chain_sizes[1], :]
+        
+        print('MYLOG', 'chain one idxs shape', chain_one_idxs.shape)
+        print('MYLOG', 'chain two idxs shape', chain_two_idxs.shape)
+        
+        c_alphas_chain_one_idxs = chain_one_idxs[chain_one_backbone[:,1]==1]
+        c_alphas_chain_two_idxs = chain_two_idxs[chain_two_backbone[:,1]==1]
+        print('MYLOG', 'c alphas chain one idxs shape', c_alphas_chain_one_idxs.shape)
+        print('MYLOG', 'c alphas chain two idxs shape', c_alphas_chain_two_idxs.shape)
+        
+        # Heavy chain positions used to fit the reference plane
+        heavy_chain_positions = torch.Tensor([36, 37, 38, 39, 89, 90, 91, 92])-1
+        # Light chain positions used to fit the reference plane
+        light_chain_positions = torch.Tensor([35, 36, 37, 38, 85, 86, 87, 88])-1
+        
+        
+        chain_one_selected_c_alpha_idxs = c_alphas_chain_one_idxs[heavy_chain_positions.long()]
+        chain_two_selected_c_alpha_idxs = c_alphas_chain_two_idxs[light_chain_positions.long()]
+        print('MYLOG', 'chain one selected c alpha idxs', chain_one_selected_c_alpha_idxs)
+        print('MYLOG', 'chain two selected c alpha idxs', chain_two_selected_c_alpha_idxs)
+
+        chain_one_selected_c_alpha_coords = coords[chain_one_selected_c_alpha_idxs]
+        chain_two_selected_c_alpha_coords = coords[chain_two_selected_c_alpha_idxs]
+        print('MYLOG', 'chain one selected c alpha coords', chain_one_selected_c_alpha_coords)
+        print('MYLOG', 'chain two selected c alpha coords', chain_two_selected_c_alpha_coords)
+
+
         #print('MYLOG', 'c alpha mask', c_alpha_mask.shape)
         #print('MYLOG', 'c alpha mask sum', c_alpha_mask.sum())
         
@@ -705,6 +738,195 @@ class AntibodyAnglePotential(Potential):
     def compute_variable(self, coords, index, compute_gradient=False):
         return None
 
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+
+def read_pdb_as_dataframe(pdb_file_path):
+    """
+    Reads PDB ATOM and HETATM records into a DataFrame using fixed-width parsing.
+    """
+    # 1. Define fixed-width columns for standard PDB format (fields are space-padded)
+    colspecs = [
+        (0, 6),    # Record name (ATOM/HETATM)
+        (6, 11),   # Atom serial number
+        (12, 16),  # Atom name
+        (17, 20),  # Residue name
+        (21, 22),  # Chain ID
+        (22, 26),  # Residue sequence number
+        (30, 38),  # X coordinate
+        (38, 46),  # Y coordinate
+        (46, 54),  # Z coordinate
+        (54, 60),  # Occupancy
+        (60, 66),  # B-factor
+        (76, 78)   # Element symbol
+    ]
+    
+    # 2. Define the column names
+    names = ['Record', 'Atom_ID', 'Name', 'ResName', 'Chain', 'ResID', 
+             'X', 'Y', 'Z', 'Occupancy', 'Bfactor', 'Element']
+
+    # 3. Read the file
+    # We use comment='#' to skip comment lines (like REMARK/HEADER)
+    # We use engine='python' for better robustness with complex formatting
+    df = pd.read_fwf(
+        pdb_file_path,
+        colspecs=colspecs,
+        names=names,
+        header=None,
+        comment='#',
+        engine='python' 
+    )
+    
+    # 4. Filter the DataFrame to keep only ATOM and HETATM records
+    df = df[df['Record'].isin(['ATOM', 'HETATM'])].copy()
+    
+    # 5. Clean up string columns and convert coordinate columns to float
+    df['Record'] = df['Record'].str.strip()
+    df[['X', 'Y', 'Z', 'Occupancy', 'Bfactor']] = df[['X', 'Y', 'Z', 'Occupancy', 'Bfactor']].astype(float)
+    
+    return df
+
+
+def fit_plane_to_coordinates(coords):
+    """
+    Fit a plane to a set of 3D coordinates using PCA.
+    
+    Parameters:
+    -----------
+    coords : array-like, shape (n, 3)
+        Array of x, y, z coordinates
+    
+    Returns:
+    --------
+    plane_params : dict
+        Dictionary containing:
+        - 'normal': normal vector to the plane (from 3rd principal component)
+        - 'centroid': centroid of the points
+        - 'pc1': first principal component (in-plane vector)
+        - 'pc2': second principal component (in-plane vector)
+    """
+    coords = np.array(coords)
+    
+    # Calculate centroid
+    centroid = np.mean(coords, axis=0)
+    
+    # Center the coordinates
+    centered_coords = coords - centroid
+    
+    # Perform PCA
+    pca = PCA(n_components=3)
+    pca.fit(centered_coords)
+    
+    # The first two components define the plane
+    # The third component is the normal to the plane
+    pc1 = pca.components_[0]  # First principal component
+    pc2 = pca.components_[1]  # Second principal component
+    normal = pca.components_[2]  # Normal vector (perpendicular to plane)
+    
+    plane_params = {
+        'normal': normal,
+        'centroid': centroid,
+        'pc1': pc1,
+        'pc2': pc2,
+        'explained_variance': pca.explained_variance_ratio_
+    }
+    
+    return plane_params
+
+
+def calculate_angle_between_planes(plane1_params, plane2_params, degrees=True):
+    """
+    Calculate the angle between two planes using their normal vectors.
+    
+    Parameters:
+    -----------
+    plane1_params : dict
+        Plane parameters from fit_plane_to_coordinates
+    plane2_params : dict
+        Plane parameters from fit_plane_to_coordinates
+    degrees : bool
+        If True, return angle in degrees; otherwise radians
+    
+    Returns:
+    --------
+    angle : float
+        Angle between the two planes
+    """
+    normal1 = plane1_params['normal']
+    normal2 = plane2_params['normal']
+    
+    # Calculate dot product
+    dot_product = np.dot(normal1, normal2)
+    
+    # Calculate magnitudes
+    mag1 = np.linalg.norm(normal1)
+    mag2 = np.linalg.norm(normal2)
+    
+    # Calculate angle (use abs to get acute angle)
+    cos_angle = np.abs(dot_product / (mag1 * mag2))
+    
+    # Clip to avoid numerical errors
+    cos_angle = np.clip(cos_angle, -1.0, 1.0)
+    
+    angle_rad = np.arccos(cos_angle)
+    
+    if degrees:
+        return np.degrees(angle_rad)
+    else:
+        return angle_rad
+
+
+def calculate_dihedral_angle(plane1_params, plane2_params, degrees=True):
+    """
+    Calculate the dihedral (torsion) angle between two planes.
+    This gives a signed angle considering the orientation of the planes.
+    
+    Parameters:
+    -----------
+    plane1_params : dict
+        Plane parameters from fit_plane_to_coordinates
+    plane2_params : dict
+        Plane parameters from fit_plane_to_coordinates
+    degrees : bool
+        If True, return angle in degrees; otherwise radians
+    
+    Returns:
+    --------
+    angle : float
+        Dihedral angle between the two planes (-180 to 180 degrees)
+    """
+    normal1 = plane1_params['normal']
+    normal2 = plane2_params['normal']
+    
+    # Calculate the angle using atan2 for signed angle
+    dot_product = np.dot(normal1, normal2)
+    cross_product = np.cross(normal1, normal2)
+    
+    angle_rad = np.arctan2(np.linalg.norm(cross_product), dot_product)
+    
+    if degrees:
+        return np.degrees(angle_rad)
+    else:
+        return angle_rad
+
+def calculate_vh_vl_angle(heavy_coords,light_coords):
+    heavy_plane = fit_plane_to_coordinates(heavy_coords)
+    light_plane = fit_plane_to_coordinates(light_coords)
+
+    # Calculate angle between planes
+    # Calculate dihedral angle
+    dihedral = calculate_dihedral_angle(heavy_plane, light_plane, degrees=True)
+    distance_between_centroids = np.linalg.norm(heavy_plane['centroid'] - light_plane['centroid'])
+    return dihedral
+
+
+def get_angle_bounds():
+    mean_angle = 11.280548920674873
+    sigma_angle = 6.9035552747199525
+    lo = mean_angle - sigma_angle
+    hi = mean_angle + sigma_angle
+    return lo,hi
 
 def get_potentials(steering_args, boltz2=False):
     potentials = []
