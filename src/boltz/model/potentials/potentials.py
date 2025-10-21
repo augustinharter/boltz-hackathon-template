@@ -673,6 +673,15 @@ class AntibodyAnglePotential(Potential):
         print('MYLOG', 'C_ALPHA SHAPE', c_alphas.shape)
         print('MYLOG', 'C_ALPHA', c_alphas)
         return torch.zeros_like(coords)
+    
+    def compute(self, coords, feats, parameters):
+        return 0
+    
+    def compute_args(self, feats, parameters):
+        return torch.empty([1, 0]), None, None, None, None
+    
+    def compute_function(self, value, *args, negation_mask=None, compute_derivative=False):
+        return None
 
 
 def get_potentials(steering_args, boltz2=False):
@@ -795,6 +804,5 @@ def get_potentials(steering_args, boltz2=False):
             ]
         )
     if steering_args["antibody_angle_bias"]:
-        potentials = [AntibodyAnglePotential(),
-            ]
+        potentials.append(AntibodyAnglePotential())
     return potentials
