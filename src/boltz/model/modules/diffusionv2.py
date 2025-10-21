@@ -395,6 +395,7 @@ class AtomDiffusion(Module):
                     )
                     atom_coords_denoised[sample_ids_chunk] = atom_coords_denoised_chunk
 
+                # original steering
                 if steering_args["fk_steering"] and (
                     (
                         step_idx % steering_args["fk_resampling_interval"] == 0
@@ -402,6 +403,7 @@ class AtomDiffusion(Module):
                     )
                     or step_idx == num_sampling_steps - 1
                 ):
+                    print('MYLOG', 'doing fk energy calculation')
                     # Compute energy of x_0 prediction
                     energy = torch.zeros(multiplicity, device=self.device)
                     for potential in potentials:
@@ -439,13 +441,13 @@ class AtomDiffusion(Module):
                         ),
                         dim=1,
                     )
-
+                    
                 # Compute guidance update to x_0 prediction
                 if (
                     steering_args["physical_guidance_update"]
                     or steering_args["contact_guidance_update"]
-                    or steering_args["antibody_angle_bias"]
                 ) and step_idx < num_sampling_steps - 1:
+                    print('MYLOG', 'doing fk steering step', step_idx)
                     guidance_update = torch.zeros_like(atom_coords_denoised)
                     for guidance_step in range(steering_args["num_gd_steps"]):
                         energy_gradient = torch.zeros_like(atom_coords_denoised)
@@ -473,6 +475,7 @@ class AtomDiffusion(Module):
                         / t_hat
                     )
 
+                # original resampling
                 if steering_args["fk_steering"] and (
                     (
                         step_idx % steering_args["fk_resampling_interval"] == 0
@@ -480,6 +483,7 @@ class AtomDiffusion(Module):
                     )
                     or step_idx == num_sampling_steps - 1
                 ):
+                    print('MYLOG', 'doing resampling', step_idx)
                     resample_indices = (
                         torch.multinomial(
                             resample_weights,
@@ -510,6 +514,21 @@ class AtomDiffusion(Module):
                     if token_repr is not None:
                         token_repr = token_repr[resample_indices]
 
+
+            # custom antibody angle steering
+            if steering_args["antibody_angle_bias"]:
+                print('MYLOG', 'doing antibody angle biasing')
+                potential = potentials[0]  # antibody angle potential is first and only in list
+                parameters = potential.compute_parameters(steering_t)
+                angle_gradient = potential.compute_gradient(
+                    atom_coords_denoised,
+                    network_condition_kwargs["feats"],
+                    parameters,
+                )
+                atom_coords_denoised += (
+                    angle_gradient * steering_args["antibody_angle_bias_weight"]
+                )
+                
             if self.alignment_reverse_diff:
                 with torch.autocast("cuda", enabled=False):
                     atom_coords_noisy = weighted_rigid_align(
