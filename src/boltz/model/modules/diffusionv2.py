@@ -520,6 +520,8 @@ class AtomDiffusion(Module):
                 print('MYLOG', 'doing antibody angle biasing')
                 potential = potentials[0]  # antibody angle potential is first and only in list
                 parameters = potential.compute_parameters(steering_t)
+                # all feature keys
+                print('MYLOG','all feature keys', network_condition_kwargs["feats"].keys())
                 angle_gradient = potential.compute_gradient(
                     atom_coords_denoised,
                     network_condition_kwargs["feats"],
