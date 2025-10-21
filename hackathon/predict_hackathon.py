@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 from collections.abc import Iterable
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import yaml
+import pandas as pd
 from hackathon_api import Datapoint, Protein, SmallMolecule
 
 # ---------------------------------------------------------------------------
@@ -91,14 +93,65 @@ def post_process_protein_complex(datapoint: Datapoint, input_dicts: List[dict[st
     Returns: 
         Sorted pdb file paths that should be used as your submission.
     """
-    # Collect all PDBs from all configurations
+    relevant_json_keys = [
+        "confidence_score",
+        "ptm",
+        "iptm",
+        "ligand_iptm",
+        "protein_iptm",
+        "complex_pldtt",
+        "complex_iplddt",
+        "complex_pde",
+        "complex_ipde"
+    ]
+    
+    # Collect all PDBs and confidence JSON files from all configurations
     all_pdbs = []
     for prediction_dir in prediction_dirs:
-        config_pdbs = sorted(prediction_dir.glob(f"{datapoint.datapoint_id}_config_*_model_*.pdb"))
+        # PDB -> List
+        config_pdbs = sorted(prediction_dir.glob(
+            f"{datapoint.datapoint_id}_config_*_model_*.pdb")
+        )
         all_pdbs.extend(config_pdbs)
+
+        # JSON
+        confidence_data = []
+        for prediction_dir in prediction_dirs:
+            confidence_files = sorted(
+                pathlib.Path(
+                    prediction_dir
+                ).glob(f"confidence_{data_id}_config_*_model_*.json")
+            )
+            for file_path in confidence_files:
+                with open(file_path) as f:
+                    confidence = json.load(f)
+
+                data_id = os.path.splitext(file_path.name)[0].split("_")[1]
+                config_id = "_".join(
+                    os.path.splitext(file_path.name)[0].split("_")[2:4]
+                )
+                structure_index = os.path.splitext(
+                    file_path.name
+                )[0].split("_")[5]
+
+                cur_confidence_data = [
+                    confidence[key] for key in relevant_json_keys
+                ]
+                confidence_data.append(
+                    [data_id, structure_index, config_id] + cur_confidence_data
+                )
+
+        confidence_data_new = pd.DataFrame(
+            data=confidence_data, 
+            columns=["data_id", "structure_index", "config_id"] + relevant_json_keys
+        )
+        confidence_data_new = confidence_data_new.sort_values(
+            by=["structure_index", "config_id"]
+        )
 
     # Sort all PDBs and return their paths
     all_pdbs = sorted(all_pdbs)
+
     return all_pdbs
 
 def post_process_protein_ligand(datapoint: Datapoint, input_dicts: List[dict[str, Any]], cli_args_list: List[list[str]], prediction_dirs: List[Path]) -> List[Path]:
