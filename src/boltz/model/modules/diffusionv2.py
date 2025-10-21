@@ -305,6 +305,7 @@ class AtomDiffusion(Module):
             steering_args["fk_steering"]
             or steering_args["physical_guidance_update"]
             or steering_args["contact_guidance_update"]
+            or steering_args["antibody_angle_bias"]
         ):
             potentials = get_potentials(steering_args, boltz2=True)
 
