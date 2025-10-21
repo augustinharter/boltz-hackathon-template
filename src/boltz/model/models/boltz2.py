@@ -1020,6 +1020,7 @@ class Boltz2(LightningModule):
             except RuntimeError as e:  # catch out of memory exceptions
                 idx_dataset = batch["idx_dataset"][0].item()
                 if "out of memory" in str(e):
+                    raise e
                     msg = f"| WARNING: ran out of memory, skipping batch, {idx_dataset}"
                     print(msg)
                     torch.cuda.empty_cache()
@@ -1040,6 +1041,7 @@ class Boltz2(LightningModule):
             except RuntimeError as e:  # catch out of memory exceptions
                 idx_dataset = batch["idx_dataset"][0].item()
                 if "out of memory" in str(e):
+                    raise e
                     msg = f"| WARNING: ran out of memory, skipping batch, {idx_dataset}"
                     print(msg)
                     torch.cuda.empty_cache()
@@ -1122,6 +1124,7 @@ class Boltz2(LightningModule):
 
         except RuntimeError as e:  # catch out of memory exceptions
             if "out of memory" in str(e):
+                raise e
                 print("| WARNING: ran out of memory, skipping batch")
                 torch.cuda.empty_cache()
                 gc.collect()
