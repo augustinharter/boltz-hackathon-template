@@ -526,7 +526,7 @@ class AtomDiffusion(Module):
                     parameters,
                 )
                 atom_coords_denoised += (
-                    angle_gradient * steering_args["antibody_angle_bias_weight"]
+                    angle_gradient * parameters["antibody_angle_bias_weight"]
                 )
                 
             if self.alignment_reverse_diff:
