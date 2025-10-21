@@ -324,6 +324,7 @@ class ConfidenceHeads(nn.Module):
 
         if self.token_level_confidence:
             plddt = compute_aggregated_metric(plddt_logits)
+            print('PRINT plddt shape:', plddt.shape, plddt.grad)
             token_pad_mask = feats["token_pad_mask"].repeat_interleave(multiplicity, 0)
             complex_plddt = (plddt * token_pad_mask).sum(dim=-1) / token_pad_mask.sum(
                 dim=-1
