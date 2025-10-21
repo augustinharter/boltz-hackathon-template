@@ -1311,6 +1311,7 @@ def predict(  # noqa: C901, PLR0915, PLR0912
         # change to false to disable original potentials
         steering_args.fk_steering = False
         steering_args.physical_guidance_update = False
+        steering_args.contact_guidance_update = False
         # disable all stearing except antibody angle bias
 
         model_cls = Boltz2 if model == "boltz2" else Boltz1

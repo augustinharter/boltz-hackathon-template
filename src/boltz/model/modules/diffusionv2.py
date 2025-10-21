@@ -447,7 +447,7 @@ class AtomDiffusion(Module):
                     steering_args["physical_guidance_update"]
                     or steering_args["contact_guidance_update"]
                 ) and step_idx < num_sampling_steps - 1:
-                    print('OOOOOOOOO|', 'doing fk steering step', step_idx)
+                    print('OOOOOOOOO', 'doing fk steering step', step_idx)
                     guidance_update = torch.zeros_like(atom_coords_denoised)
                     for guidance_step in range(steering_args["num_gd_steps"]):
                         energy_gradient = torch.zeros_like(atom_coords_denoised)
@@ -483,7 +483,7 @@ class AtomDiffusion(Module):
                     )
                     or step_idx == num_sampling_steps - 1
                 ):
-                    print('OOOOOOOOO|', 'doing resampling', step_idx)
+                    print('OOOOOOOOO', 'doing resampling', step_idx)
                     resample_indices = (
                         torch.multinomial(
                             resample_weights,
