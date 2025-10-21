@@ -301,6 +301,7 @@ class AtomDiffusion(Module):
         steering_args=None,
         **network_condition_kwargs,
     ):
+        print('OOOOOO', 'starting sampling with steering_args', steering_args)
         if steering_args is not None and (
             steering_args["fk_steering"]
             or steering_args["physical_guidance_update"]
