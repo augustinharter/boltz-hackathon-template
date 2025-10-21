@@ -677,7 +677,7 @@ class AntibodyAnglePotential(Potential):
 
 def get_potentials(steering_args, boltz2=False):
     potentials = []
-    print('STEERING ARGS', steering_args)
+    print('MYLOG', 'STEERING ARGS', steering_args)
     
     if steering_args["fk_steering"] or steering_args["physical_guidance_update"]:
         potentials.extend(
