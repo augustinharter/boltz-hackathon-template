@@ -1,5 +1,5 @@
 # Submission Documentation
-Our team (Erik, Jan, Ali, Alex, Augustin) pursued two separate approaches:
+Our team (Erik Kubaczka, Jan Krumbach, Mushtaq Ali, Alexander Betz, Augustin Harter) pursued two separate approaches:
 1. Antibody Angle Potential: Creating a custom potential, that guides the VL-VH angle towards an empirical angle distributione extracted from PDBase (work not completed)
 2. Hyperparameter Tuning & Pocket sampling
 
