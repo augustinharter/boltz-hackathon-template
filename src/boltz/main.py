@@ -1307,10 +1307,14 @@ def predict(  # noqa: C901, PLR0915, PLR0912
         }
 
         steering_args = BoltzSteeringParams()
-        steering_args.fk_steering = use_potentials
-        steering_args.physical_guidance_update = use_potentials
+        
+        # change to false to disable original potentials
+        steering_args.fk_steering = False
+        steering_args.physical_guidance_update = False
 
         model_cls = Boltz2 if model == "boltz2" else Boltz1
+        steering_args = asdict(steering_args)
+        steering_args.update({'antibody_angle_bias': use_potentials})
         model_module = model_cls.load_from_checkpoint(
             checkpoint,
             strict=True,
@@ -1321,7 +1325,8 @@ def predict(  # noqa: C901, PLR0915, PLR0912
             use_kernels=not no_kernels,
             pairformer_args=asdict(pairformer_args),
             msa_args=asdict(msa_args),
-            steering_args=asdict(steering_args),
+            # steering_args=asdict(steering_args), original
+            steering_args=steering_args,
         )
         model_module.eval()
 

@@ -670,6 +670,8 @@ class ContactPotentital(FlatBottomPotential, DistancePotential):
 
 def get_potentials(steering_args, boltz2=False):
     potentials = []
+    print('STEERING ARGS', steering_args)
+    
     if steering_args["fk_steering"] or steering_args["physical_guidance_update"]:
         potentials.extend(
             [
@@ -785,16 +787,15 @@ def get_potentials(steering_args, boltz2=False):
                 ),
             ]
         )
-    if potentials == []:
-        print('DEBUG potentials triggered!', potentials)
-    potentials = [TemplateReferencePotential(
-                    parameters={
-                        "guidance_interval": 2,
-                        "guidance_weight": 0.1
-                        if steering_args["contact_guidance_update"]
-                        else 0.0,
-                        "resampling_weight": 1.0,
-                    }
-                ),
-    ]
+    if steering_args["antibody_angle_bias"]:
+        potentials = [TemplateReferencePotential(
+                        parameters={
+                            "guidance_interval": 2,
+                            "guidance_weight": 0.1
+                            if steering_args["contact_guidance_update"]
+                            else 0.0,
+                            "resampling_weight": 1.0,
+                        }
+                    ),
+            ]
     return potentials
