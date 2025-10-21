@@ -683,6 +683,9 @@ class AntibodyAnglePotential(Potential):
     def compute_function(self, value, *args, negation_mask=None, compute_derivative=False):
         return None
 
+    def compute_variable(self, coords, index, compute_gradient=False):
+        return None
+
 
 def get_potentials(steering_args, boltz2=False):
     potentials = []
