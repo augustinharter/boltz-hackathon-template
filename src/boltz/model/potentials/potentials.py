@@ -686,39 +686,34 @@ class AntibodyAnglePotential(Potential):
         backbone = feats["atom_backbone_feat"]
         
         idxs = torch.arange(backbone.shape[1], device=backbone.device)
+        chain_one_idxs = idxs[:chain_sizes[0]]
+        chain_two_idxs = idxs[chain_sizes[0]:chain_sizes[0]+chain_sizes[1]]
         
-        chain_one_backbone = backbone[0, 0:chain_sizes[0], :]
-        chain_two_backbone = backbone[0, chain_sizes[0]:chain_sizes[0]+chain_sizes[1], :]
+        c_alpha_mask = backbone[0, :, 1] == 1  # C-alpha atoms have backbone feature 1 in the second position
+        chain_one_c_alpha_mask = c_alpha_mask[:chain_sizes[0]]
+        chain_two_c_alpha_mask = c_alpha_mask[chain_sizes[0]:chain_sizes[0]+chain_sizes[1]]
         
-        print('MYLOG', 'chain one backbone shape', chain_one_backbone.shape)
-        print('MYLOG', 'chain two backbone shape', chain_two_backbone.shape)
+        chain_one_ca_idxs = chain_one_idxs[chain_one_c_alpha_mask]
+        chain_two_ca_idxs = chain_two_idxs[chain_two_c_alpha_mask]
         
-        chain_one_idxs = idxs[0, 0:chain_sizes[0], :]
-        chain_two_idxs = idxs[0, chain_sizes[0]:chain_sizes[0]+chain_sizes[1], :]
-        
-        print('MYLOG', 'chain one idxs shape', chain_one_idxs.shape)
-        print('MYLOG', 'chain two idxs shape', chain_two_idxs.shape)
-        
-        c_alphas_chain_one_idxs = chain_one_idxs[chain_one_backbone[:,1]==1]
-        c_alphas_chain_two_idxs = chain_two_idxs[chain_two_backbone[:,1]==1]
-        print('MYLOG', 'c alphas chain one idxs shape', c_alphas_chain_one_idxs.shape)
-        print('MYLOG', 'c alphas chain two idxs shape', c_alphas_chain_two_idxs.shape)
-        
-        # Heavy chain positions used to fit the reference plane
-        heavy_chain_positions = torch.Tensor([36, 37, 38, 39, 89, 90, 91, 92])-1
-        # Light chain positions used to fit the reference plane
-        light_chain_positions = torch.Tensor([35, 36, 37, 38, 85, 86, 87, 88])-1
-        
-        
-        chain_one_selected_c_alpha_idxs = c_alphas_chain_one_idxs[heavy_chain_positions.long()]
-        chain_two_selected_c_alpha_idxs = c_alphas_chain_two_idxs[light_chain_positions.long()]
-        print('MYLOG', 'chain one selected c alpha idxs', chain_one_selected_c_alpha_idxs)
-        print('MYLOG', 'chain two selected c alpha idxs', chain_two_selected_c_alpha_idxs)
+        heavy_chain_positions = torch.Tensor([36, 37, 38, 39, 89, 90, 91, 92])-1  # Heavy chain positions used to fit the reference plane
+        light_chain_positions = torch.Tensor([35, 36, 37, 38, 85, 86, 87, 88])-1  # Light chain positions used to fit the reference plane
 
-        chain_one_selected_c_alpha_coords = coords[chain_one_selected_c_alpha_idxs]
-        chain_two_selected_c_alpha_coords = coords[chain_two_selected_c_alpha_idxs]
-        print('MYLOG', 'chain one selected c alpha coords', chain_one_selected_c_alpha_coords)
-        print('MYLOG', 'chain two selected c alpha coords', chain_two_selected_c_alpha_coords)
+        chain_one_selected_ca_idxs = chain_one_ca_idxs[heavy_chain_positions.long()]
+        chain_two_selected_ca_idxs = chain_two_ca_idxs[light_chain_positions.long()]
+        
+        chain_one_selected_ca_coords = coords[0, chain_one_selected_ca_idxs].detach()  # assuming batch size of 1
+        chain_two_selected_ca_coords = coords[0, chain_two_selected_ca_idxs].detach()
+        chain_one_selected_ca_coords.requires_grad_(True)
+        chain_two_selected_ca_coords.requires_grad_(True)
+
+        angle = calculate_vh_vl_angle(chain_one_selected_ca_coords, chain_two_selected_ca_coords)
+        print('MYLOG', 'angle', angle.item())
+        
+        angle.backward()
+        
+        # check grad
+        print('MYLOG', 'angle grad', angle.grad, chain_one_selected_ca_coords.grad, chain_two_selected_ca_coords.grad)
 
 
         #print('MYLOG', 'c alpha mask', c_alpha_mask.shape)
@@ -740,7 +735,6 @@ class AntibodyAnglePotential(Potential):
 
 import pandas as pd
 import numpy as np
-from sklearn.decomposition import PCA
 
 def read_pdb_as_dataframe(pdb_file_path):
     """
@@ -788,7 +782,7 @@ def read_pdb_as_dataframe(pdb_file_path):
     return df
 
 
-def fit_plane_to_coordinates(coords):
+def fit_plane_to_coordinates(coords: torch.Tensor):
     """
     Fit a plane to a set of 3D coordinates using PCA.
     
@@ -806,30 +800,29 @@ def fit_plane_to_coordinates(coords):
         - 'pc1': first principal component (in-plane vector)
         - 'pc2': second principal component (in-plane vector)
     """
-    coords = np.array(coords)
     
     # Calculate centroid
-    centroid = np.mean(coords, axis=0)
+    centroid = torch.mean(coords, dim=0)
     
     # Center the coordinates
     centered_coords = coords - centroid
     
-    # Perform PCA
-    pca = PCA(n_components=3)
-    pca.fit(centered_coords)
+
+    U, S, Vt = torch.linalg.svd(centered_coords)
+    print('MYLOG', 'SVD Vt', Vt, 'requires grad', Vt.requires_grad)
+    # TODO SVD removes gradients: either use a differentiable PCA or implement custom gradients based on angle
     
     # The first two components define the plane
     # The third component is the normal to the plane
-    pc1 = pca.components_[0]  # First principal component
-    pc2 = pca.components_[1]  # Second principal component
-    normal = pca.components_[2]  # Normal vector (perpendicular to plane)
-    
+    pc1 = Vt[0]  # First principal component
+    pc2 = Vt[1]  # Second principal component
+    normal = Vt[2]  # Normal vector (perpendicular to plane)
+
     plane_params = {
         'normal': normal,
         'centroid': centroid,
         'pc1': pc1,
         'pc2': pc2,
-        'explained_variance': pca.explained_variance_ratio_
     }
     
     return plane_params
@@ -877,7 +870,7 @@ def calculate_angle_between_planes(plane1_params, plane2_params, degrees=True):
         return angle_rad
 
 
-def calculate_dihedral_angle(plane1_params, plane2_params, degrees=True):
+def calculate_dihedral_angle(plane1_params, plane2_params, degrees=True) -> torch.Tensor:
     """
     Calculate the dihedral (torsion) angle between two planes.
     This gives a signed angle considering the orientation of the planes.
@@ -900,13 +893,13 @@ def calculate_dihedral_angle(plane1_params, plane2_params, degrees=True):
     normal2 = plane2_params['normal']
     
     # Calculate the angle using atan2 for signed angle
-    dot_product = np.dot(normal1, normal2)
-    cross_product = np.cross(normal1, normal2)
-    
-    angle_rad = np.arctan2(np.linalg.norm(cross_product), dot_product)
-    
+    dot_product = torch.dot(normal1, normal2)
+    cross_product = torch.cross(normal1, normal2, dim=0)
+
+    angle_rad = torch.atan2(torch.norm(cross_product), dot_product)
+
     if degrees:
-        return np.degrees(angle_rad)
+        return torch.rad2deg(angle_rad)
     else:
         return angle_rad
 
@@ -917,7 +910,7 @@ def calculate_vh_vl_angle(heavy_coords,light_coords):
     # Calculate angle between planes
     # Calculate dihedral angle
     dihedral = calculate_dihedral_angle(heavy_plane, light_plane, degrees=True)
-    distance_between_centroids = np.linalg.norm(heavy_plane['centroid'] - light_plane['centroid'])
+    #distance_between_centroids = torch.linalg.norm(heavy_plane['centroid'] - light_plane['centroid'])
     return dihedral
 
 
